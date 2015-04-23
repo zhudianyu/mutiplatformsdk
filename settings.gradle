@@ -1,0 +1,9 @@
+include ':libs:unity'
+//include ':libs:cocos2dx'
+include ':libs:libs-snail'
+include ':projects:talkingsdk-u3d'
+//include ':projects:talkingsdk'
+include ':projects:talkingsdk-snail'
+include ':projects:talkingsdk-snail-u3d-demo'
+//include ':projects:talkingsdk-snail-demo'
+

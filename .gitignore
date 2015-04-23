@@ -1,0 +1,9 @@
+*.*
+/*
+!build.gradle
+!settings.gradle
+!.gitignore
+!gradlew
+!gradle.properties
+!local.properties
+!SdkCmd.sh

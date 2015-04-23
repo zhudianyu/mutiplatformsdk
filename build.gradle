@@ -1,0 +1,92 @@
+import org.ajoberstar.gradle.git.tasks.*
+import org.ajoberstar.grgit.Grgit
+import org.apache.tools.ant.taskdefs.condition.Os
+import java.nio.file.Paths
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.ajoberstar:gradle-git:1.0.0'
+    }
+}
+
+task initProjects << {
+    def base_git_url = 'git@repos.code4.in:androidsdks'
+    def projects = ["talkingsdk","talkingsdk-nd","talkingsdk-nd-demo-lua","talkingsdk-wdj", "talkingsdk-wdj-demo-lua"]
+    for( project in projects ){
+        println "${base_git_url}/${project}.git"
+        def full_path = "$projectDir/projects/${project}"
+        def dir = file(full_path)
+        if (! dir.isDirectory()) {
+            def grgit = Grgit.clone(dir: new File(full_path), uri: "${base_git_url}/${project}.git")
+        } else {
+            def grgit = Grgit.open(full_path)
+            grgit.pull()
+        }
+    }
+    def libs = ["libs-nd","libs-dk","libs-wanwan","libs-oppo", "libs-wdj", "cocos2dx"]
+    for( lib in libs ){
+        println "${base_git_url}/${lib}.git"
+        def full_path = "$projectDir/libs/${lib}"
+        def dir = file(full_path)
+        if (! dir.isDirectory()) {
+            if (lib.equals("cocos2dx")) {
+                def trd_git_url = 'git@repos.code4.in:3rdparty';
+                def grgit = Grgit.clone(dir: new File(full_path), uri: "${trd_git_url}/${lib}.git")
+            } else {
+                def grgit = Grgit.clone(dir: new File(full_path), uri: "${base_git_url}/${lib}.git")
+            }
+        } else {
+            def grgit = Grgit.open(full_path)
+            grgit.pull()
+        }
+    }
+}
+
+def expandPath(path) {
+    return Paths.get(path).toString().replaceFirst("^~",System.getProperty("user.home"))
+}
+
+def getCurrentDirectory() {
+    File configFile = file("local.properties")
+    return configFile.getParentFile().toURI().toString()
+}
+ext.mavenDirectory = getCurrentDirectory() + "maven"
+
+def readEnv(){
+    def env = [parallel : 10 , ndk : "/my/ndk/path"]
+    def filename = "local.properties"
+    File configFile = file(filename)
+    Properties envProperties = new Properties()
+
+    if (configFile.exists()) {
+        envProperties.load(new FileInputStream(configFile))
+        env['parallel'] =  envProperties['parallel'] == null ?  10 : envProperties['parallel']
+        env['ndk'] =  expandPath(envProperties['ndk.dir'])
+    } else {
+        assert false: "config file not exists"
+    }
+    return env
+}
+
+allprojects {
+    //task init (dependsOn: initProjects) << {task -> println "I'm $task.project.name" }
+    task init() << {}
+    task ndkBuild(dependsOn: init, type: Exec) {
+        def ndkModulePath = getEnvironment()["NDK_MODULE_PATH"]
+        def sep = null
+        def ndkBuildCmd = null
+        def env= readEnv()
+        if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+            sep = ';'
+            ndkBuildCmd = 'ndk-build.cmd'
+        } else {
+            sep = ':'
+            ndkBuildCmd = 'ndk-build'
+        }
+        environment("NDK_MODULE_PATH",ndkModulePath + sep + getWorkingDir() + "/jni:" + getCurrentDirectory() + "/libs")
+        commandLine ndkBuildCmd, '-j' + env['parallel']
+    }
+}
